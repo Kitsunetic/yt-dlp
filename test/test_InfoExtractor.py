@@ -1472,6 +1472,32 @@ jwplayer("mediaplayer").setup({"abouttext":"Visit Indie DB","aboutlink":"http:\/
                 expect_value(self, formats, expected_formats, None)
                 expect_value(self, subtitles, expected_subtitles, None)
 
+    def test_parse_mpd_byte_range_segments(self):
+        # SegmentList whose Initialization/SegmentURL omit @sourceURL/@media
+        # and address the BaseURL by byte ranges (e.g. chzzk.naver.com)
+        with open('./test/testdata/mpd/byte_range_segments.mpd', encoding='utf-8') as f:
+            formats = self.ie._parse_mpd_formats(
+                compat_etree_fromstring(f.read().encode()),
+                mpd_base_url='https://example.com/', mpd_url='https://example.com/manifest.mpd')
+        formats = {f['format_id']: f for f in formats}
+
+        video = formats['video_720']
+        self.assertEqual(video['protocol'], 'http_dash_segments')
+        self.assertEqual(video['fragment_base_url'], 'https://example.com/video/720p.mp4')
+        self.assertEqual(video['fragments'], [
+            {'url': 'https://example.com/video/720p.mp4', 'byte_range': {'start': 0, 'end': 80375}},
+            {'url': 'https://example.com/video/720p.mp4', 'byte_range': {'start': 80375, 'end': 146120}, 'duration': 4.0},
+            {'url': 'https://example.com/video/720p.mp4', 'byte_range': {'start': 146120, 'end': 210829}, 'duration': 4.0},
+        ])
+
+        # @sourceURL/@media keep working, and may be mixed with byte ranges
+        audio = formats['audio_128']
+        self.assertEqual(audio['fragments'], [
+            {'path': 'init.m4a'},
+            {'path': 'seg-1.m4a', 'duration': 4.0},
+            {'url': 'https://example.com/audio/128k.m4a', 'byte_range': {'start': 0, 'end': 1000}, 'duration': 4.0},
+        ])
+
     def test_parse_ism_formats(self):
         _TEST_CASES = [
             (

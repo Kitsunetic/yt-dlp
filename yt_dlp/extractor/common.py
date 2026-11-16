@@ -2914,10 +2914,23 @@ class InfoExtractor:
                 if segment_duration:
                     ms_info['segment_duration'] = float(segment_duration)
 
+            def parse_byte_range(value):
+                # "first-last", last byte inclusive
+                mobj = re.fullmatch(r'\s*(\d+)\s*-\s*(\d+)\s*', value or '')
+                if mobj:
+                    return {'start': int(mobj.group(1)), 'end': int(mobj.group(2)) + 1}
+
             def extract_Initialization(source):
                 initialization = source.find(_add_ns('Initialization'))
                 if initialization is not None:
-                    ms_info['initialization_url'] = initialization.attrib['sourceURL']
+                    # @sourceURL is optional; without it the BaseURL is used,
+                    # optionally restricted by @range
+                    source_url = initialization.get('sourceURL')
+                    if source_url:
+                        ms_info['initialization_url'] = source_url
+                    initialization_range = parse_byte_range(initialization.get('range'))
+                    if initialization_range:
+                        ms_info['initialization_range'] = initialization_range
 
             segment_list = element.find(_add_ns('SegmentList'))
             if segment_list is not None:
@@ -2925,7 +2938,12 @@ class InfoExtractor:
                 extract_Initialization(segment_list)
                 segment_urls_e = segment_list.findall(_add_ns('SegmentURL'))
                 if segment_urls_e:
-                    ms_info['segment_urls'] = [segment.attrib['media'] for segment in segment_urls_e]
+                    # @media is optional; without it the BaseURL is used,
+                    # optionally restricted by @mediaRange
+                    ms_info['segment_urls'] = [segment.get('media') for segment in segment_urls_e]
+                    segment_ranges = [parse_byte_range(segment.get('mediaRange')) for segment in segment_urls_e]
+                    if any(segment_ranges):
+                        ms_info['segment_ranges'] = segment_ranges
             else:
                 segment_template = element.find(_add_ns('SegmentTemplate'))
                 if segment_template is not None:
@@ -3086,6 +3104,15 @@ class InfoExtractor:
                     def location_key(location):
                         return 'url' if re.match(r'https?://', location) else 'path'
 
+                    def segment_fragment(location, byte_range=None):
+                        # A SegmentURL/Initialization without a URL refers to the BaseURL
+                        fragment = {location_key(location): location} if location else {'url': base_url}
+                        if byte_range:
+                            fragment['byte_range'] = byte_range
+                        return fragment
+
+                    segment_ranges = representation_ms_info.get('segment_ranges') or []
+
                     if 'segment_urls' not in representation_ms_info and 'media' in representation_ms_info:
 
                         media_template = prepare_template('media', ('Number', 'Bandwidth', 'Time'))
@@ -3146,9 +3173,10 @@ class InfoExtractor:
                         for s in representation_ms_info['s']:
                             duration = float_or_none(s['d'], timescale)
                             for _ in range(s.get('r', 0) + 1):
-                                segment_uri = representation_ms_info['segment_urls'][segment_index]
                                 fragments.append({
-                                    location_key(segment_uri): segment_uri,
+                                    **segment_fragment(
+                                        representation_ms_info['segment_urls'][segment_index],
+                                        traverse_obj(segment_ranges, segment_index)),
                                     'duration': duration,
                                 })
                                 segment_index += 1
@@ -3161,10 +3189,8 @@ class InfoExtractor:
                         segment_duration = float_or_none(
                             representation_ms_info['segment_duration'],
                             representation_ms_info['timescale']) if 'segment_duration' in representation_ms_info else None
-                        for segment_url in representation_ms_info['segment_urls']:
-                            fragment = {
-                                location_key(segment_url): segment_url,
-                            }
+                        for segment_index, segment_url in enumerate(representation_ms_info['segment_urls']):
+                            fragment = segment_fragment(segment_url, traverse_obj(segment_ranges, segment_index))
                             if segment_duration:
                                 fragment['duration'] = segment_duration
                             fragments.append(fragment)
@@ -3181,11 +3207,12 @@ class InfoExtractor:
                             'fragments': [],
                             'protocol': 'mhtml' if mime_type in ('image/avif', 'image/jpeg') else 'http_dash_segments',
                         })
-                        if 'initialization_url' in representation_ms_info:
-                            initialization_url = representation_ms_info['initialization_url']
+                        if 'initialization_url' in representation_ms_info or 'initialization_range' in representation_ms_info:
+                            initialization_url = representation_ms_info.get('initialization_url')
                             if not f.get('url'):
                                 f['url'] = initialization_url
-                            f['fragments'].append({location_key(initialization_url): initialization_url})
+                            f['fragments'].append(segment_fragment(
+                                initialization_url, representation_ms_info.get('initialization_range')))
                         f['fragments'].extend(representation_ms_info['fragments'])
                         if not period_duration:
                             period_duration = try_get(

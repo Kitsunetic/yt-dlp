@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" profiles="urn:mpeg:dash:profile:full:2011" type="static" mediaPresentationDuration="PT8S" minBufferTime="PT2S">
+  <Period id="0" start="PT0S">
+    <AdaptationSet mimeType="video/mp4">
+      <Representation id="video_720" bandwidth="3191000" width="1280" height="720" frameRate="60" codecs="avc1.4d4020,mp4a.40.2">
+        <BaseURL>https://example.com/video/720p.mp4</BaseURL>
+        <SegmentList timescale="48000" duration="192000">
+          <Initialization range="0-80374"/>
+          <SegmentURL mediaRange="80375-146119"/>
+          <SegmentURL mediaRange="146120-210828"/>
+        </SegmentList>
+      </Representation>
+    </AdaptationSet>
+    <AdaptationSet mimeType="audio/mp4">
+      <Representation id="audio_128" bandwidth="128000" audioSamplingRate="48000" codecs="mp4a.40.2">
+        <BaseURL>https://example.com/audio/128k.m4a</BaseURL>
+        <SegmentList timescale="1000">
+          <Initialization sourceURL="init.m4a"/>
+          <SegmentTimeline>
+            <S t="0" d="4000" r="1"/>
+          </SegmentTimeline>
+          <SegmentURL media="seg-1.m4a"/>
+          <SegmentURL mediaRange="0-999"/>
+        </SegmentList>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>
