@@ -13,6 +13,37 @@
 </div>
 <!-- MANPAGE: END EXCLUDED SECTION -->
 
+<!-- MANPAGE: BEGIN EXCLUDED SECTION -->
+> [!NOTE]
+> **개인 포크 (Kitsunetic/yt-dlp)**
+>
+> 원본 [yt-dlp/yt-dlp](https://github.com/yt-dlp/yt-dlp)에 아래 수정을 얹은 개인용 포크입니다. 수정은 `custom` 브랜치에 있고, `master`는 원본과 같게 둡니다. 원본은 AI로 만든 기여를 받지 않으므로 이 수정은 원본에 PR로 보내지 않습니다.
+>
+> **설치**
+>
+> ```bash
+> pip install --upgrade --force-reinstall 'yt-dlp[default] @ https://github.com/Kitsunetic/yt-dlp/archive/custom.tar.gz'
+> ```
+>
+> 같은 환경에서 `pip install --upgrade yt-dlp`나 `yt-dlp -U`를 실행하면 PyPI/원본 릴리스로 덮어써집니다.
+>
+> **수정 사항**
+>
+> | 날짜 | 내용 | 파일 |
+> |---|---|---|
+> | 2026-11-17 | MPD `SegmentList`에서 `Initialization@sourceURL`, `SegmentURL@media`가 없고 `@range`/`@mediaRange`만 있는 경우를 지원합니다. 이때 `BaseURL` 파일의 바이트 구간을 fragment로 받습니다. 원본은 `KeyError('sourceURL')`로 실패합니다. 치지직(chzzk.naver.com)·네이버 VOD가 이 형식을 씁니다. | `yt_dlp/extractor/common.py`, `yt_dlp/downloader/dash.py`, `test/test_InfoExtractor.py`, `test/testdata/mpd/byte_range_segments.mpd` |
+>
+> **원본 업데이트 반영**
+>
+> ```bash
+> git fetch upstream
+> git checkout custom && git merge upstream/master
+> python -m pytest test/test_InfoExtractor.py
+> git push origin custom
+> git checkout master && git merge --ff-only upstream/master && git push origin master
+> ```
+<!-- MANPAGE: END EXCLUDED SECTION -->
+
 yt-dlp is a feature-rich command-line audio/video downloader with support for [thousands of sites](supportedsites.md). The project is a fork of [youtube-dl](https://github.com/ytdl-org/youtube-dl) based on the now inactive [youtube-dlc](https://github.com/blackjack4494/yt-dlc).
 
 <!-- MANPAGE: MOVE "USAGE AND OPTIONS" SECTION HERE -->
